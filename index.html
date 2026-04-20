@@ -541,6 +541,7 @@ const KPI_DEFS = [
 
 // ── Render Overview KPI row ────────────────────────────────
 const kpiRow = document.getElementById('kpiRow');
+kpiRow.innerHTML = '';
 KPI_DEFS.forEach(k => {
   const el = document.createElement('div');
   el.className = 'kpi' + (k.clickable ? ' clickable' : '');
@@ -559,6 +560,7 @@ const FAC_DEFS = [
 const FAC_COLORS = Object.fromEntries(FAC_DEFS.map(f => [f.id, f.color]));
 
 const facilityGrid = document.getElementById('facilityGrid');
+facilityGrid.innerHTML = '';
 FAC_DEFS.forEach(({id, color}) => {
   const fr = RAW.filter(r => r.facility === id);
   if (!fr.length) return;
@@ -1151,11 +1153,12 @@ function rebuildDashboard(newData) {
 
 async function downloadUpdatedDashboard() {
   try {
-    const response = await fetch(window.location.href, {cache: 'no-store'});
+    const response = await fetch('index.html', {cache: 'no-store'});
+    if (!response.ok) throw new Error('HTTP ' + response.status);
     const html = await response.text();
     const lines = html.split('\n');
     const idx = lines.findIndex(l => l.trimStart().startsWith('const RAW = ['));
-    if (idx === -1) { alert('Could not locate data section. Try again after uploading.'); return; }
+    if (idx === -1) { alert('Could not locate data section in fetched file.'); return; }
     lines[idx] = 'const RAW = ' + JSON.stringify(RAW) + ';';
     const blob = new Blob([lines.join('\n')], {type: 'text/html'});
     const a = document.createElement('a');
