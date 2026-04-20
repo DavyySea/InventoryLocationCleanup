@@ -471,6 +471,7 @@ const warehouseBin = RAW.filter(r => r.location_format === 'warehouse_bin').leng
 const workcenterFmt= RAW.filter(r => r.location_format === 'workcenter').length;
 const linesideRack = RAW.filter(r => r.location_format === 'lineside_rack').length;
 const fsaStation   = RAW.filter(r => r.location_format === 'fsa_station').length;
+const connexFmt    = RAW.filter(r => r.location_format === 'connex').length;
 const convPct      = Math.round(newStd / total * 100);
 
 document.getElementById('asOf').textContent = 'As of ' + new Date().toLocaleString('en-US', {month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', second:'2-digit'}) + ' · ' + (window.__dataSource || 'embedded');
@@ -525,6 +526,13 @@ const KPI_DEFS = [
     heroSub:'Format: {FAC}FSA{nn} — e.g. 504FSA01, FLAFSA11, ES4FSA03',
   },
   {
+    lbl:'Connex Format', val:connexFmt.toLocaleString(), sub:'FAC · CXA · #',
+    color:'#f43f5e', pct:Math.round(connexFmt/total*100), fillColor:'#f43f5e', clickable:true,
+    filterFn: r => r.location_format === 'connex',
+    icon:'📦', heroColor:'#f43f5e',
+    heroSub:'Format: {FAC}CXA{nn} — e.g. FLACXA01',
+  },
+  {
     lbl:'Available', val:available.toLocaleString(), sub:Math.round(available/total*100)+'% of total',
     color:'var(--green)', pct:Math.round(available/total*100), fillColor:'var(--green)', clickable:true,
     filterFn: r => r.available,
@@ -574,6 +582,7 @@ FAC_DEFS.forEach(({id, color}) => {
     workcenter:    fr.filter(r=>r.location_format==='workcenter').length,
     lineside_rack: fr.filter(r=>r.location_format==='lineside_rack').length,
     fsa_station:   fr.filter(r=>r.location_format==='fsa_station').length,
+    connex:        fr.filter(r=>r.location_format==='connex').length,
   };
   const el = document.createElement('div');
   el.className = 'fac-card';
@@ -587,6 +596,7 @@ FAC_DEFS.forEach(({id, color}) => {
     ${fmts.workcenter?`<div class="fac-row"><span style="color:var(--purple)">↳ Workcenter</span><span>${fmts.workcenter}</span></div>`:''}
     ${fmts.lineside_rack?`<div class="fac-row"><span style="color:var(--cyan)">↳ Lineside Rack</span><span>${fmts.lineside_rack}</span></div>`:''}
     ${fmts.fsa_station?`<div class="fac-row"><span style="color:var(--orange)">↳ FSA Station</span><span>${fmts.fsa_station}</span></div>`:''}
+    ${fmts.connex?`<div class="fac-row"><span style="color:#f43f5e">↳ Connex</span><span>${fmts.connex}</span></div>`:''}
     <div class="two-bar" style="margin-top:10px">
       <div class="seg-new" style="width:${pct}%"></div>
       <div class="seg-old" style="width:${100-pct}%"></div>
@@ -624,9 +634,9 @@ function makeBar(id, labels, data, color) {
 
 const overviewCharts = {};
 overviewCharts.conv = makeDonut('convChart', ['New Standard','Legacy'], [newStd,legacy], ['#34d399','#ef4444']);
-const fmtLs=['Warehouse Bin','Workcenter','Lineside Rack','FSA Station','Needs Conversion'];
-const fmtDs=[warehouseBin,workcenterFmt,linesideRack,fsaStation,legacy];
-const fmtCs=['#4f8ef7','#a78bfa','#22d3ee','#fb923c','#ef4444'];
+const fmtLs=['Warehouse Bin','Workcenter','Lineside Rack','FSA Station','Connex','Needs Conversion'];
+const fmtDs=[warehouseBin,workcenterFmt,linesideRack,fsaStation,connexFmt,legacy];
+const fmtCs=['#4f8ef7','#a78bfa','#22d3ee','#fb923c','#f43f5e','#ef4444'];
 overviewCharts.fmt = makeDonut('fmtChart', fmtLs, fmtDs, fmtCs);
 const fmtLeg=document.getElementById('fmtLegend');
 fmtLs.forEach((l,i)=>{ const d=document.createElement('div'); d.className='leg'; d.innerHTML=`<div class="leg-dot" style="background:${fmtCs[i]}"></div>${l}`; fmtLeg.appendChild(d); });
@@ -941,10 +951,11 @@ function exportCSV() {
 
 // ── File Ingestion ─────────────────────────────────────────
 const FACILITIES = ['HQ7','504','FLA','ES7','ES5','ES4','ES3'];
-const W_RE  = /^([A-Z0-9]{2,6})R\d+S\d+[BD]\d+$/;
-const L_RE  = /^([A-Z0-9]{3})[A-Z]R\d+S\d+R\d+$/;
-const WC_RE = /^([A-Z0-9]{3})[A-Z]R\d+S\d+$/;
+const W_RE   = /^([A-Z0-9]{2,6})R\d+S\d+[BD]\d+$/;
+const L_RE   = /^([A-Z0-9]{3})[A-Z]R\d+S\d+R\d+$/;
+const WC_RE  = /^([A-Z0-9]{3})[A-Z]R\d+S\d+$/;
 const FSA_RE = /^([A-Z0-9]{2,6})FSA\d+$/;
+const CXA_RE = /^([A-Z0-9]{2,6})CXA\d+$/;
 
 function classifyName(name) {
   let m;
@@ -952,6 +963,7 @@ function classifyName(name) {
   if ((m = L_RE.exec(name)))   return { fmt:'lineside_rack', fac:m[1] };
   if ((m = WC_RE.exec(name)))  return { fmt:'workcenter',    fac:m[1] };
   if ((m = FSA_RE.exec(name))) return { fmt:'fsa_station',   fac:m[1] };
+  if ((m = CXA_RE.exec(name))) return { fmt:'connex',        fac:m[1] };
   const fac = FACILITIES.find(f => name.toUpperCase().startsWith(f)) || 'Other';
   return { fmt:'legacy', fac };
 }
@@ -1082,19 +1094,20 @@ function rebuildDashboard(newData) {
   const wc2  = RAW.filter(r => r.location_format==='workcenter').length;
   const ls2  = RAW.filter(r => r.location_format==='lineside_rack').length;
   const fsa2 = RAW.filter(r => r.location_format==='fsa_station').length;
+  const cx2  = RAW.filter(r => r.location_format==='connex').length;
 
   // Update as-of date
   document.getElementById('asOf').textContent = 'As of ' + new Date().toLocaleString('en-US', {month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', second:'2-digit'}) + ' (updated)';
 
-  // Rebuild KPI values — order matches KPI_DEFS: total, newStd, legacy, warehouse, workcenter, lineside, fsa, available, unavailable
-  const vals = [t, ns, leg, wb2, wc2, ls2, fsa2, avl, t-avl];
+  // Rebuild KPI values — order matches KPI_DEFS: total, newStd, legacy, warehouse, workcenter, lineside, fsa, connex, available, unavailable
+  const vals = [t, ns, leg, wb2, wc2, ls2, fsa2, cx2, avl, t-avl];
   document.querySelectorAll('#kpiRow .kpi .val').forEach((el,i) => {
     if (vals[i] !== undefined) el.textContent = vals[i].toLocaleString();
   });
   document.querySelectorAll('#kpiRow .kpi .sub').forEach((el,i) => {
     const pcts = [null, Math.round(ns/t*100), 100-Math.round(ns/t*100),
                   Math.round(wb2/t*100), Math.round(wc2/t*100), Math.round(ls2/t*100),
-                  Math.round(fsa2/t*100), Math.round(avl/t*100), Math.round((t-avl)/t*100)];
+                  Math.round(fsa2/t*100), Math.round(cx2/t*100), Math.round(avl/t*100), Math.round((t-avl)/t*100)];
     if (pcts[i] !== null && pcts[i] !== undefined) {
       const orig = el.textContent;
       el.textContent = orig.replace(/\d+%/, pcts[i]+'%');
@@ -1103,7 +1116,7 @@ function rebuildDashboard(newData) {
   document.querySelectorAll('#kpiRow .kpi .bar-fill').forEach((el,i) => {
     const pcts = [null, Math.round(ns/t*100), 100-Math.round(ns/t*100),
                   Math.round(wb2/t*100), Math.round(wc2/t*100), Math.round(ls2/t*100),
-                  Math.round(fsa2/t*100), Math.round(avl/t*100), Math.round((t-avl)/t*100)];
+                  Math.round(fsa2/t*100), Math.round(cx2/t*100), Math.round(avl/t*100), Math.round((t-avl)/t*100)];
     if (pcts[i] !== null && pcts[i] !== undefined) el.style.width = pcts[i]+'%';
   });
 
@@ -1119,6 +1132,8 @@ function rebuildDashboard(newData) {
       warehouse_bin:fr.filter(r=>r.location_format==='warehouse_bin').length,
       workcenter:fr.filter(r=>r.location_format==='workcenter').length,
       lineside_rack:fr.filter(r=>r.location_format==='lineside_rack').length,
+      fsa_station:fr.filter(r=>r.location_format==='fsa_station').length,
+      connex:fr.filter(r=>r.location_format==='connex').length,
     };
     const el=document.createElement('div'); el.className='fac-card';
     el.innerHTML=`<div class="fac-name" style="color:${color}">${id}</div>
@@ -1129,6 +1144,8 @@ function rebuildDashboard(newData) {
       ${fmts.warehouse_bin?`<div class="fac-row"><span style="color:var(--accent)">↳ Warehouse Bin</span><span>${fmts.warehouse_bin}</span></div>`:''}
       ${fmts.workcenter?`<div class="fac-row"><span style="color:var(--purple)">↳ Workcenter</span><span>${fmts.workcenter}</span></div>`:''}
       ${fmts.lineside_rack?`<div class="fac-row"><span style="color:var(--cyan)">↳ Lineside Rack</span><span>${fmts.lineside_rack}</span></div>`:''}
+      ${fmts.fsa_station?`<div class="fac-row"><span style="color:var(--orange)">↳ FSA Station</span><span>${fmts.fsa_station}</span></div>`:''}
+      ${fmts.connex?`<div class="fac-row"><span style="color:#f43f5e">↳ Connex</span><span>${fmts.connex}</span></div>`:''}
       <div class="two-bar" style="margin-top:10px"><div class="seg-new" style="width:${pct}%"></div><div class="seg-old" style="width:${100-pct}%"></div></div>
       <div class="fac-pct"><span style="color:var(--green)">${pct}% converted</span><span>${100-pct}% remaining</span></div>`;
     document.getElementById('facilityGrid').appendChild(el);
@@ -1137,7 +1154,7 @@ function rebuildDashboard(newData) {
   // Update overview charts — 'none' skips animation so it's instant
   overviewCharts.conv.data.datasets[0].data = [ns, leg];
   overviewCharts.conv.update('none');
-  overviewCharts.fmt.data.datasets[0].data = [wb2, wc2, ls2, fsa2, leg];
+  overviewCharts.fmt.data.datasets[0].data = [wb2, wc2, ls2, fsa2, cx2, leg];
   overviewCharts.fmt.update('none');
   overviewCharts.type.data.datasets[0].data = tLabels.map(t2 => RAW.filter(r=>(r.type||'')===t2).length);
   overviewCharts.type.update('none');
